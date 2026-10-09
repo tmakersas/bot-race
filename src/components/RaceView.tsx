@@ -217,6 +217,12 @@ export default function RaceView({ initial, compact, photo, showYou }: Props) {
           timing your run...
         </div>
       )}
+      {key && !compact && (
+        <div className="mb-4 [&>section]:mt-0">
+          <OwnerPanel race={race} k={key} raceUrl={raceUrl} onStarted={poll} />
+        </div>
+      )}
+
       {me && !key && (!compact || showYou) && (
         <div className="mb-4">
           <YouBanner race={race} sorted={sorted} origin={origin} myHit={me} onClaimed={poll} />
@@ -272,7 +278,6 @@ export default function RaceView({ initial, compact, photo, showYou }: Props) {
       {compact ? null : (
         <>
 
-          {key && <OwnerPanel race={race} k={key} raceUrl={raceUrl} onStarted={poll} />}
 
           <section className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {LANES.map((l) => {
