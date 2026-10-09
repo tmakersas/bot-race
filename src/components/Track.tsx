@@ -203,7 +203,7 @@ export default function Track({ hits, origin, clockRef, mine, compact, appear }:
           const cur = leaders.get(li);
           if (!cur || h.t < cur.t) leaders.set(li, h);
         }
-        if (mine && Math.abs(h.t - mine) < 2 && h.l === "human") mineHit = { x, y };
+        if (mine && Math.abs(h.t - mine) < 2) mineHit = { x, y };
       }
 
       // Lane leaders get a name tag.
