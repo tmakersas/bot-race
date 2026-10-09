@@ -3,16 +3,25 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Track from "./Track";
+import Watchers from "./Watchers";
+import YouBanner from "./YouBanner";
 import { buildCalls, type Call } from "@/lib/caller";
 import { LANES, LANE_INDEX, type Hit, type LaneId, type Race } from "@/lib/lanes";
 import { BASE, SITE } from "@/lib/site";
 import { fmtClock, fmtSecs } from "@/lib/time";
+import { watchers } from "@/lib/watchers";
+import type { Me } from "@/lib/lanes";
 
-type Props = { initial: Race; compact?: boolean; photo?: boolean };
+type Props = { initial: Race; compact?: boolean; photo?: boolean; showYou?: boolean };
 
 const REPLAY_MS = 6500;
 
 function originOf(race: Race, hits: Hit[]): { origin: number; label: string; kind: "tweet" | "x" | "first" | "created" } {
+  if (race.house) {
+    // Today's race runs from midnight, but a 24h log track bunches everyone at the end. Show this hour.
+    const h = Math.floor(Date.now() / 3600_000) * 3600_000;
+    return { origin: h, label: `today's race · this hour, since ${new Date(h).toISOString().slice(11, 16)} UTC`, kind: "created" };
+  }
   if (race.t0) return { origin: race.t0, label: "since the tweet went live", kind: "tweet" };
   const sorted = [...hits].sort((a, b) => a.t - b.t);
   const x = sorted.find((h) => h.l === "x");
@@ -26,7 +35,7 @@ function readCookie(name: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-export default function RaceView({ initial, compact, photo }: Props) {
+export default function RaceView({ initial, compact, photo, showYou }: Props) {
   const [race, setRace] = useState<Race>(initial);
   const [hits, setHits] = useState<Hit[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -34,6 +43,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
   const [calls, setCalls] = useState<Call[]>([]);
   const [shownCalls, setShownCalls] = useState(0);
   const [mine, setMine] = useState<number | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [key, setKey] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [hideHumans, setHideHumans] = useState(false);
@@ -45,6 +55,8 @@ export default function RaceView({ initial, compact, photo }: Props) {
   const replayStart = useRef<number | null>(null);
   const hitsMap = useRef(new Map<number, Hit>());
   const raceRef = useRef(race);
+  const meRef = useRef<Me | null>(null);
+  const meMiss = useRef(0);
   raceRef.current = race;
 
   const { origin, label: originLabel, kind } = useMemo(() => originOf(race, hits), [race, hits]);
@@ -67,6 +79,15 @@ export default function RaceView({ initial, compact, photo }: Props) {
     }
     setRace(d.race);
     if (added) setHits([...hitsMap.current.values()]);
+    // Our own result is computed server-side when we arrive, so it works past the stored-runner cap.
+    if (document.cookie.includes(`br_me_${initial.id}=`) && !meRef.current) {
+      const mr = await fetch(`${BASE}/api/race/${initial.id}/me`, { cache: "no-store" }).catch(() => null);
+      const md = mr?.ok ? ((await mr.json()) as { me: Me | null }) : null;
+      if (md?.me) {
+        meRef.current = md.me;
+        setMe(md.me);
+      } else if (++meMiss.current > 8) setMine(null);
+    }
     setLoaded(true);
     // Big race: keep pulling chunks until we are caught up.
     if (d.hits.length === 500) setTimeout(poll, 50);
@@ -78,7 +99,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
     const loop = () => {
       const r = raceRef.current;
       const age = Date.now() - (r.t0 || r.created);
-      const every = document.hidden ? 15000 : age < 15 * 60_000 ? 1000 : age < 6 * 3600_000 ? 3000 : 10000;
+      const every = document.hidden ? 15000 : r.house ? 2500 : age < 15 * 60_000 ? 1000 : age < 6 * 3600_000 ? 3000 : 10000;
       t = setTimeout(async () => {
         await poll();
         loop();
@@ -90,7 +111,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
 
   useEffect(() => {
     const m = readCookie(`br_me_${initial.id}`);
-    if (m) setMine(Number(m));
+    if (m) setMine(Number(m.split(".")[0]));
     // Owner link (?k=...): remember the key on this device, then hide it from the URL.
     const qk = new URLSearchParams(location.search).get("k");
     if (qk) {
@@ -157,7 +178,6 @@ export default function RaceView({ initial, compact, photo }: Props) {
   const outsider = sorted.find((h) => h.t >= origin && h.l !== "x" && h.l !== "human");
   const firstAi = sorted.find((h) => h.t >= origin && h.l === "ai");
   const myHit = mine ? sorted.find((h) => Math.abs(h.t - mine) < 2) : null;
-  const beatMe = myHit ? sorted.filter((h) => h.t < myHit.t && h.l !== "human").length : 0;
   const raceUrl = `${SITE}/r/${race.id}`;
   const photoUrl = `${SITE}/p/${race.id}`;
 
@@ -165,11 +185,17 @@ export default function RaceView({ initial, compact, photo }: Props) {
   const table = rows.slice(0, showAll ? 300 : 25);
 
   const shareText = useMemo(() => {
+    const fh = sorted.find((h) => h.l === "human" && h.t >= origin);
+    const w = watchers(fh ? sorted.filter((h) => h.t < fh.t) : sorted);
+    if (w.length >= 3 && fh) {
+      const ai = w.find((x) => x.first.l === "ai");
+      return `${w.length} companies read my link before my first follower did${ai && kind !== "created" ? `\n${ai.name} was there ${fmtSecs(ai.first.t - origin)} after I posted` : ""}\n\n${bots} bots, ${laneCounts.human} humans. photo finish:`;
+    }
     const parts = [`${bots} bots${laneCounts.human ? ` and ${laneCounts.human} humans` : ""} opened my link`];
     if (outsider && kind === "tweet") parts.push(`first outsider: ${outsider.n} at ${fmtSecs(outsider.t - origin)} after I posted`);
     parts.push(laneCounts.ai ? `${laneCounts.ai} AI crawlers in the field` : "zero AI crawlers. AI answers don't know this page exists");
     return parts.join("\n") + "\n\nphoto finish:";
-  }, [bots, laneCounts, outsider, kind, origin]);
+  }, [bots, laneCounts, outsider, kind, origin, sorted]);
 
   return (
     <div className={compact ? "" : "mx-auto max-w-6xl px-4 pb-24 pt-5 sm:px-6"}>
@@ -183,6 +209,18 @@ export default function RaceView({ initial, compact, photo }: Props) {
             {mode === "live" ? "live" : "replay"} · race {race.id}
           </span>
         </header>
+      )}
+
+      {showYou && mine && !me && (
+        <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 font-mono text-[12px] uppercase tracking-[0.2em] text-white/55">
+          <span className="live-dot mr-2 inline-block h-2 w-2 rounded-full bg-flag" />
+          timing your run...
+        </div>
+      )}
+      {me && !key && (!compact || showYou) && (
+        <div className="mb-4">
+          <YouBanner race={race} sorted={sorted} origin={origin} myHit={me} onClaimed={poll} />
+        </div>
       )}
 
       <section className={`relative overflow-hidden rounded-2xl border border-white/10 bg-turf ${compact ? "" : "shadow-[0_0_80px_-20px_rgba(184,255,61,0.25)]"}`}>
@@ -227,13 +265,12 @@ export default function RaceView({ initial, compact, photo }: Props) {
         </div>
       </section>
 
+      {compact && showYou && (
+        <Watchers race={race} sorted={sorted} origin={origin} myHit={myHit ?? null} />
+      )}
+
       {compact ? null : (
         <>
-          {myHit && (
-            <div className="mt-4 rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold">
-              You crossed the line at <b className="tnum">{fmtSecs(myHit.t - origin)}</b>. {beatMe} bot{beatMe === 1 ? "" : "s"} got here before you did.
-            </div>
-          )}
 
           {key && <OwnerPanel race={race} k={key} raceUrl={raceUrl} onStarted={poll} />}
 
@@ -251,6 +288,8 @@ export default function RaceView({ initial, compact, photo }: Props) {
               );
             })}
           </section>
+
+          <Watchers race={race} sorted={sorted} origin={origin} myHit={myHit ?? null} />
 
           <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_340px]">
             <div className="overflow-hidden rounded-2xl border border-white/10">
@@ -307,6 +346,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
             </div>
 
             <aside className="space-y-4">
+              <HumansBoard race={race} sorted={sorted} origin={origin} />
               <div className="rounded-2xl border border-hype/30 bg-hype/[0.06] p-4">
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-hype">AI lane</div>
                 {laneCounts.ai ? (
@@ -333,7 +373,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
                 </a>
                 {!key && (
                   <Link href="/#start" className="mt-2 block rounded-lg border border-white/20 px-4 py-2.5 text-center text-sm text-chalk hover:border-white/50">
-                    Start your own race
+                    Who reads your tweets? Start your race
                   </Link>
                 )}
               </div>
@@ -362,11 +402,47 @@ function Stat({ label, value, accent }: { label: string; value: number; accent?:
   );
 }
 
+function HumansBoard({ race, sorted, origin }: { race: Race; sorted: Hit[]; origin: number }) {
+  const humans = sorted.filter((h) => h.l === "human" && (race.house || h.t >= origin));
+  const claims = race.claims || {};
+  return (
+    <div className="rounded-2xl border border-gold/30 bg-gold/[0.05] p-4">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">{race.house ? "humans today" : "human podium"}</div>
+      {humans.length ? (
+        <ol className="mt-3 space-y-1.5 font-mono text-[13px]">
+          {humans.slice(0, 8).map((h, i) => {
+            const name = claims[String(h.s)];
+            return (
+              <li key={h.s} className="flex items-center gap-3">
+                <span className={`w-5 ${i === 0 ? "text-gold" : "text-white/35"}`}>{i === 0 ? "1" : i + 1}</span>
+                <span className="flex-1 truncate">
+                  {name ? (
+                    <a href={`https://x.com/${name}`} target="_blank" rel="noopener" className={i === 0 ? "text-gold hover:underline" : "text-chalk hover:underline"}>
+                      @{name}
+                    </a>
+                  ) : (
+                    <span className="text-white/40">unclaimed {h.c ? `(${h.c})` : ""}</span>
+                  )}
+                </span>
+                <span className="tnum text-white/60">{race.house ? new Date(h.t).toISOString().slice(11, 19) : fmtSecs(h.t - origin)}</span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="mt-2 text-sm text-white/60">No human yet. The first one to open {race.house ? "this page" : "the link"} gets their name here.</p>
+      )}
+      {humans.length > 8 && <p className="mt-2 font-mono text-[11px] text-white/40">+{humans.length - 8} more humans</p>}
+    </div>
+  );
+}
+
 function OwnerPanel({ race, k, raceUrl, onStarted }: { race: Race; k: string; raceUrl: string; onStarted: () => void }) {
   const [tweet, setTweet] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
   const fire = async () => {
     setBusy(true);
     setErr(null);
@@ -377,9 +453,14 @@ function OwnerPanel({ race, k, raceUrl, onStarted }: { race: Race; k: string; ra
     setTweet("");
     onStarted();
   };
+  const postText = "this link is a race.\n\nbots are already running. first human to click gets their name on the board 👇";
   return (
-    <section className="mt-4 rounded-2xl border border-flag/40 bg-flag/[0.07] p-4 sm:p-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-flag">your race · only you see this</div>
+    <section className="mt-4 rounded-2xl border border-hype/40 bg-hype/[0.06] p-4 sm:p-5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-hype">your race · only you see this</div>
+      <h2 className="mt-1 font-display text-3xl uppercase leading-none sm:text-4xl">Post this link on X. That&apos;s it.</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
+        The clock starts the moment X opens the link. Your followers race the bots, and each other: the first human gets their name on the board. You won&apos;t count as a runner on this device.
+      </p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <code className="flex-1 truncate rounded-lg border border-white/15 bg-black/50 px-3 py-2.5 text-sm text-chalk">{raceUrl}</code>
         <button
@@ -388,31 +469,46 @@ function OwnerPanel({ race, k, raceUrl, onStarted }: { race: Race; k: string; ra
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="rounded-lg bg-chalk px-4 py-2.5 text-sm font-semibold text-ink"
+          className="rounded-lg border border-white/25 px-4 py-2.5 text-sm font-semibold text-chalk hover:border-white/60"
         >
-          {copied ? "Copied" : "Copy race link"}
+          {copied ? "Copied" : "Copy"}
         </button>
+        <a
+          href={`https://x.com/intent/post?text=${encodeURIComponent(postText)}&url=${encodeURIComponent(raceUrl)}`}
+          target="_blank"
+          rel="noopener"
+          className="rounded-lg bg-hype px-4 py-2.5 text-center text-sm font-semibold text-ink"
+        >
+          Post it on X
+        </a>
       </div>
       {race.t0 ? (
         <p className="mt-3 text-sm text-white/70">
-          Gun fired at the tweet&apos;s timestamp.{" "}
+          Timed from the tweet&apos;s own timestamp{race.owner ? <>, and your race is on the Bot Magnet board as @{race.owner}</> : null}.{" "}
           <a href={race.tweet || "#"} target="_blank" rel="noopener" className="text-chalk underline underline-offset-4">
             See the tweet
           </a>
         </p>
       ) : (
-        <>
-          <p className="mt-3 text-sm leading-relaxed text-white/70">
-            1. Post the link on X (a main post is fastest, a reply hidden in a thread works too). 2. Paste the tweet URL here. We read the exact millisecond it went live from its ID and restart the clock from there. Anything that opened the link before that is a false start.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <input value={tweet} onChange={(e) => setTweet(e.target.value)} placeholder="https://x.com/you/status/..." className="flex-1 rounded-lg border border-white/15 bg-black/50 px-3 py-2.5 text-sm text-chalk placeholder:text-white/30 focus:border-flag focus:outline-none" />
-            <button onClick={fire} disabled={busy || !tweet} className="rounded-lg bg-flag px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">
-              {busy ? "Firing..." : "Fire the gun"}
-            </button>
-          </div>
-          {err && <p className="mt-2 text-sm text-flag">{err}</p>}
-        </>
+        <div className="mt-3">
+          <button onClick={() => setOpen((v) => !v)} className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/55 hover:text-white">
+            {open ? "−" : "+"} optional: get on the Bot Magnet board
+          </button>
+          {open && (
+            <>
+              <p className="mt-2 text-sm leading-relaxed text-white/60">
+                Paste your tweet: the clock moves to the exact millisecond it went live (read from its ID), and your race enters the board of links that pulled the most bots in 10 minutes, under your handle.
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input value={tweet} onChange={(e) => setTweet(e.target.value)} placeholder="https://x.com/you/status/..." className="flex-1 rounded-lg border border-white/15 bg-black/50 px-3 py-2.5 text-sm text-chalk placeholder:text-white/30 focus:border-hype focus:outline-none" />
+                <button onClick={fire} disabled={busy || !tweet} className="rounded-lg bg-chalk px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">
+                  {busy ? "Timing..." : "Use this tweet"}
+                </button>
+              </div>
+              {err && <p className="mt-2 text-sm text-flag">{err}</p>}
+            </>
+          )}
+        </div>
       )}
     </section>
   );

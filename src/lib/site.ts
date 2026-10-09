@@ -2,6 +2,6 @@
 export const BASE = "/bot-race";
 export const SITE = process.env.NEXT_PUBLIC_SITE_URL || `https://www.tmaker.io${BASE}`;
 
-export const TITLE = "Bot Race: who opens your link first?";
+export const TITLE = "Bot Race: bots got here before you";
 export const DESC =
-  "Post a race link on X. Every bot that opens it gets timed from the second your tweet goes live: X, AI crawlers, SEO tools, monitoring firms, then the humans. Live lanes, split times, photo finish.";
+  "Every link you post on X gets read by bots within seconds: X, OpenAI, Google, SEO tools. Bot Race times and names every one of them, then your followers race to be the first human.";

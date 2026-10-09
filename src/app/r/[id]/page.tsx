@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/r/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const title = "This link is a racetrack";
-  const description = "Every bot that opens this link is being timed, live. X, AI crawlers, SEO tools, monitoring firms, then the humans. Click to see who got here first.";
+  const title = "This link is a race. The bots are winning.";
+  const description = "Every bot that opens this link is being timed, live. The first human to click gets their name on the board. Click to see how many bots beat you.";
   const url = `${SITE}/r/${id}`;
   // A fixed card: X caches the first card it sees, and the race is empty at that moment.
   const image = `${SITE}/api/og?gate=${id}`;

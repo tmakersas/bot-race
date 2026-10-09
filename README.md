@@ -2,7 +2,9 @@
 
 Who opens your link first after you post it on X?
 
-Start a race, post the race link, paste the tweet URL. Every request to the link becomes a runner, timed from the millisecond the tweet went live (read from the tweet's snowflake ID). Runners get one of eight lanes: X itself, AI crawlers, search engines, SEO and data tools, link previews, scripts, browsers in data centers ("ghosts") and humans.
+v2 (2026-10-09): the homepage is itself a live race. Every visit to tmaker.io/bot-race is a runner in today's race (UTC), so visitors instantly see how many bots got there before them, and the first human of the day can claim the spot with their X handle. On any race link, humans race the bots and each other: claims are tied to a signed runner cookie, so only the browser that crossed the line can claim it. Boards: fastest humans ever (time from the tweet), bot magnets (most bots in the first 10 minutes, races with a pasted tweet), fastest bots. "Who's watching" lists the companies that read the link before you did.
+
+Start a race and post the link. The clock starts at X's first visit; pasting the tweet URL is optional and moves the clock to the tweet's own millisecond. Every request to the link becomes a runner, timed from the millisecond the tweet went live (read from the tweet's snowflake ID). Runners get one of eight lanes: X itself, AI crawlers, search engines, SEO and data tools, link previews, scripts, browsers in data centers ("ghosts") and humans.
 
 Live at https://www.tmaker.io/bot-race. Idea from @levelsio's crawler test (Oct 2026).
 

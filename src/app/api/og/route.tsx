@@ -43,7 +43,7 @@ export async function GET(req: Request) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", padding: "18px 56px 0" }}>
             <span style={{ fontFamily: "Anton", fontSize: 96, lineHeight: 1, letterSpacing: 1 }}>THIS LINK IS A RACETRACK.</span>
-            <span style={{ fontSize: 26, marginTop: 14, color: "rgba(242,240,233,0.75)" }}>Every bot that opens it is being timed. Live.</span>
+            <span style={{ fontSize: 26, marginTop: 14, color: "rgba(242,240,233,0.75)" }}>{gate ? "The bots are already running. First human to click gets their name on the board." : "Every bot that opens your link, timed and named. Then the humans fight for first."}</span>
           </div>
           <div style={{ display: "flex", position: "absolute", bottom: 0, left: 0, width: 1200, height: 44, alignItems: "center", justifyContent: "space-between", padding: "0 56px", background: "#b8ff3d", color: "#07080a", fontSize: 20, fontWeight: 700 }}>
             <span>tmaker.io/bot-race</span>

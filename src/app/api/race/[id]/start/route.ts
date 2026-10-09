@@ -14,7 +14,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/race/[id]/start
   if (tw.t > Date.now() + 60_000) return Response.json({ error: "That tweet is from the future. Impressive, but no." }, { status: 400 });
   const handle = String(body?.tweet || "").match(/(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status/)?.[1];
   const tweet = handle ? `https://x.com/${handle}/status/${tw.id}` : `https://x.com/i/status/${tw.id}`;
-  const r = await setStart(id, key, tw.t, tweet);
+  const r = await setStart(id, key, tw.t, tweet, handle || null);
   if (r === "nokey") return Response.json({ error: "Only the person who started this race can fire the gun." }, { status: 403 });
   if (r === "missing") return Response.json({ error: "No such race" }, { status: 404 });
   return Response.json({ ok: true, t0: tw.t, tweet });
