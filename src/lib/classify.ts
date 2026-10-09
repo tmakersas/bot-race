@@ -168,15 +168,26 @@ function shortUa(ua: string): string {
   return ua.length > 140 ? ua.slice(0, 139) + "." : ua;
 }
 
+/** Reverse DNS names often spell out the IP ("static.1.2.3.4.clients.host.de"). Keep only the domain then. */
+function safeHost(host: string | null, ip: string): string | undefined {
+  if (!host) return undefined;
+  const parts = ip.split(/[.:]/).filter((p) => p.length >= 2);
+  const leaks = parts.filter((p) => host.includes(p)).length >= 2 || /\d{1,3}[-.]\d{1,3}[-.]\d{1,3}/.test(host);
+  if (!leaks) return host;
+  const labels = host.split(".");
+  return "*." + labels.slice(-2).join(".");
+}
+
 export async function classify(ua: string, ip: string, method: string, t: number, s: number, asnHint?: string, country?: string): Promise<Hit> {
-  const [asn, host] = await Promise.all([lookupAsn(ip, asnHint), lookupRdns(ip)]);
+  const [asn, rawHost] = await Promise.all([lookupAsn(ip, asnHint), lookupRdns(ip)]);
+  const host = safeHost(rawHost, ip);
   const org = asn?.org;
   const rawOrg = asn?.raw || "";
   const base = { s, t, ...(method !== "GET" ? { m: method } : {}) };
 
   const rule = RULES.find((r) => r.re.test(ua));
   if (rule) {
-    const v = (rule.rdns && host && rule.rdns.test(host)) || (rule.org && rule.org.test(rawOrg)) ? 1 : 0;
+    const v = (rule.rdns && rawHost && rule.rdns.test(rawHost)) || (rule.org && rule.org.test(rawOrg)) ? 1 : 0;
     return { ...base, l: rule.lane, n: rule.name, v, o: org, h: host || undefined, u: shortUa(ua) };
   }
 

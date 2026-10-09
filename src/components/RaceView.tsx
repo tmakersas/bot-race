@@ -91,6 +91,14 @@ export default function RaceView({ initial, compact, photo }: Props) {
   useEffect(() => {
     const m = readCookie(`br_me_${initial.id}`);
     if (m) setMine(Number(m));
+    // Owner link (?k=...): remember the key on this device, then hide it from the URL.
+    const qk = new URLSearchParams(location.search).get("k");
+    if (qk) {
+      localStorage.setItem(`br_k_${initial.id}`, qk);
+      const prev = (readCookie("br_o") || "").split(".").filter(Boolean).slice(-20);
+      if (!prev.includes(initial.id)) document.cookie = `br_o=${[...prev, initial.id].join(".")}; path=${BASE}; max-age=${60 * 60 * 24 * 60}; samesite=lax`;
+      history.replaceState(null, "", location.pathname);
+    }
     const k = localStorage.getItem(`br_k_${initial.id}`);
     if (k) setKey(k);
   }, [initial.id]);

@@ -16,6 +16,7 @@ export function proxy(req: NextRequest, event: NextFetchEvent) {
   // The race owner watching their own race is not a runner.
   const owner = req.cookies.get("br_o")?.value || "";
   if (owner.split(".").includes(id)) return NextResponse.next();
+  if (req.nextUrl.searchParams.has("k")) return NextResponse.next();
 
   // A browser that already ran this race is a returning visitor, not a new runner.
   if (req.cookies.get(`br_me_${id}`)) return NextResponse.next();
