@@ -12,7 +12,7 @@ export default function Watchers({ race, sorted, origin, myHit }: { race: Race; 
   const who = myHit && myHit.l === "human" ? "you did" : "the first human did";
   const head = cut
     ? `${list.length} ${list.length === 1 ? "company" : "companies"} read ${race.house ? "this page" : "this link"} before ${who}.`
-    : `${list.length} ${list.length === 1 ? "company has" : "companies have"} read this link. Not one human yet.`;
+    : `${list.length} ${list.length === 1 ? "company has" : "companies have"} read ${race.house ? "this page today" : "this link"}. Not one human yet.`;
   return (
     <section className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/50">who&apos;s watching</div>

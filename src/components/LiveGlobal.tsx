@@ -40,7 +40,7 @@ export function TodayCount({ initial }: { initial: Global }) {
   return (
     <span className="flex items-center gap-2">
       <span className="live-dot inline-block h-2 w-2 rounded-full bg-flag" />
-      {g.today.runners.toLocaleString("en-US")} runners today · {g.today.humans.toLocaleString("en-US")} human{g.today.humans === 1 ? "" : "s"}
+      {g.today.runners.toLocaleString("en-US")} runner{g.today.runners === 1 ? "" : "s"} today · {g.today.humans.toLocaleString("en-US")} human{g.today.humans === 1 ? "" : "s"}
     </span>
   );
 }
@@ -61,7 +61,7 @@ export default function LiveGlobal({ initial }: { initial: Global }) {
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/60">Every race, live</h2>
           <span className="font-mono text-[11px] text-white/40">
-            today: {g.today.bots.toLocaleString("en-US")} bots, {g.today.humans.toLocaleString("en-US")} humans
+            today: {g.today.bots.toLocaleString("en-US")} bot{g.today.bots === 1 ? "" : "s"}, {g.today.humans.toLocaleString("en-US")} human{g.today.humans === 1 ? "" : "s"}
           </span>
         </div>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/30">
