@@ -136,7 +136,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
       for (const h of sorted) {
         if (h.t - origin <= c && !appear.has(h.s)) appear.set(h.s, now);
       }
-      if (clockEl.current) clockEl.current.textContent = race.t0 || sorted.length ? fmtClock(c) : "--:--.--";
+      if (clockEl.current) clockEl.current.textContent = fmtClock(c);
       let n = 0;
       for (const call of calls) if (call.at <= c) n++;
       setShownCalls((prev) => (prev === n ? prev : n));
@@ -194,7 +194,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
               {originLabel}
             </div>
             <span ref={clockEl} className={`tnum block font-display leading-[0.9] text-chalk ${compact ? "text-6xl sm:text-7xl" : "text-[22vw] sm:text-[120px]"}`}>
-              --:--.--
+              00:00.00
             </span>
           </div>
           <div className="grid grid-cols-3 gap-4 font-mono sm:gap-6 sm:text-right">
