@@ -340,7 +340,7 @@ export default function RaceView({ initial, compact, photo }: Props) {
 
               <div className="rounded-2xl border border-white/10 p-4 text-[12px] leading-relaxed text-white/50">
                 <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">How we judge</div>
-                Every request to the race link is a runner. The name comes from the user agent, which anyone can fake, so it says <i>claims</i> unless the network (reverse DNS or ASN owner) matches the company. A normal browser coming from a cloud server goes to the ghost lane. We never show IP addresses.
+                Every request to the race link is a runner. The name comes from the user agent, which anyone can fake, so it says <i>claims</i> unless the network (reverse DNS or ASN owner) matches the company. A normal browser coming from a cloud server goes to the ghost lane. Scrapers that rent home internet connections still pass as humans, so the human lane is an upper bound. We never show IP addresses.
                 {photo ? null : <> Times use the tweet&apos;s own timestamp, read from its ID.</>}
               </div>
             </aside>

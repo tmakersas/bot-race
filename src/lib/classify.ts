@@ -178,6 +178,16 @@ function safeHost(host: string | null, ip: string): string | undefined {
   return "*." + labels.slice(-2).join(".");
 }
 
+const GENERIC_HOST = /your-server\.de|amazonaws\.com|googleusercontent\.com|linodeusercontent|vultrusercontent|ip-\d|static|dynamic|dhcp|pool|broadband|cable|dsl|fiber|cloud|server|host|vps|colo|datacenter|ovh\.|hetzner|contabo|leaseweb|clients|customer|rev\.|in-addr|ip6|ipv6/i;
+
+function ownDomain(host: string | null): string | null {
+  if (!host) return null;
+  const labels = host.toLowerCase().split(".");
+  const two = labels.slice(-2).join(".");
+  const dom = /^(co|com|net|org|ac)\.[a-z]{2}$/.test(two) ? labels.slice(-3).join(".") : two;
+  return GENERIC_HOST.test(dom) ? null : dom;
+}
+
 export async function classify(ua: string, ip: string, method: string, t: number, s: number, asnHint?: string, country?: string): Promise<Hit> {
   const [asn, rawHost] = await Promise.all([lookupAsn(ip, asnHint), lookupRdns(ip)]);
   const host = safeHost(rawHost, ip);
@@ -215,12 +225,14 @@ export async function classify(ua: string, ip: string, method: string, t: number
     // iCloud Private Relay sends real Safari users out through Akamai, Cloudflare and Fastly.
     const relay = /iPhone|iPad|Mac OS X/.test(ua) && !/Chrome|CriOS|Firefox|Edg/.test(ua) && /akamai|cloudflare|fastly/i.test(rawOrg);
     if (org && DATACENTER_RE.test(rawOrg) && !relay) {
-      return { ...base, l: "ghost", n: `"${bw}" on ${org}`, v: 0, o: org, h: host || undefined, u: shortUa(ua) };
+      // Unmasked: the reverse DNS name often says who is really behind the "browser".
+      const dom = ownDomain(rawHost);
+      return { ...base, l: "ghost", n: dom ? `"${bw}" from ${dom}` : `"${bw}" on ${org}`, v: 0, o: org, h: host || undefined, u: shortUa(ua) };
     }
     // Humans: no host, no user agent, only the network owner.
-    const dev = /iPhone|iPad/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "browser";
+    const dev = /iPhone|iPad/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "";
     const inX = /Twitter|TwitterAndroid/i.test(ua) ? " in the X app" : "";
-    return { ...base, l: "human", n: `Human on ${dev}${inX}`, v: 0, o: relay ? "iCloud Private Relay" : org, ...(country ? { c: country } : {}) };
+    return { ...base, l: "human", n: dev ? `Human on ${dev}${inX}` : `Human${inX}`, v: 0, o: relay ? "iCloud Private Relay" : org, ...(country ? { c: country } : {}) };
   }
 
   const named = ua.match(BOTWORD_RE);
